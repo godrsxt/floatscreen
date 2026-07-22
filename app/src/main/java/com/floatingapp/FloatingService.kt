@@ -3,17 +3,20 @@ package com.floatingapp
 import android.app.ActivityOptions
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Build
 import android.os.IBinder
-import android.provider.Settings
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.Toast
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 
 class FloatingService : Service() {
 
@@ -31,42 +34,43 @@ class FloatingService : Service() {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) 
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY 
+            else 
+                WindowManager.LayoutParams.TYPE_PHONE,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         )
 
         params.gravity = Gravity.TOP or Gravity.START
-        params.x = 0
-        params.y = 200
+        params.x = 20
+        params.y = 100
 
         windowManager.addView(floatingView, params)
 
-        val bubble = floatingView.findViewById<View>(R.id.floating_bubble)
+        // Close button logic
+        floatingView.findViewById<Button>(R.id.btn_close).setOnClickListener {
+            stopSelf()
+        }
 
-        // Make the button draggable and clickable
+        setupDragging(params)
+        loadInstalledApps()
+    }
+
+    private fun setupDragging(params: WindowManager.LayoutParams) {
+        val header = floatingView.findViewById<View>(R.id.drag_header)
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
         var initialTouchY = 0f
 
-        bubble.setOnTouchListener { _, event ->
+        header.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
                     initialY = params.y
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
-                    val diffX = (event.rawX - initialTouchX).toInt()
-                    val diffY = (event.rawY - initialTouchY).toInt()
-                    
-                    // If tap was short, treat it as a click to launch an app
-                    if (Math.abs(diffX) < 10 && Math.abs(diffY) < 10) {
-                        launchAppInFreeformWindow()
-                    }
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -80,23 +84,65 @@ class FloatingService : Service() {
         }
     }
 
-    private fun launchAppInFreeformWindow() {
-        // By default, this boilerplate launches Android Settings. 
-        // You can change this to packageManager.getLaunchIntentForPackage("com.youtube.android") etc.
-        val intent = Intent(Settings.ACTION_SETTINGS)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+    private fun loadInstalledApps() {
+        val container = floatingView.findViewById<LinearLayout>(R.id.app_list_container)
+        val pm = packageManager
+        
+        // Find all launchable apps
+        val intent = Intent(Intent.ACTION_MAIN, null)
+        intent.addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = pm.queryIntentActivities(intent, 0)
 
-        try {
-            val options = ActivityOptions.makeBasic()
-            // Define the size of the floating window (Left, Top, Right, Bottom bounds)
-            val rect = Rect(100, 200, 900, 1200)
-            options.launchBounds = rect
+        for (app in apps) {
+            // Filter out this app itself
+            if (app.activityInfo.packageName == packageName) continue
+
+            // Create a horizontal layout for Icon + Name
+            val itemLayout = LinearLayout(this)
+            itemLayout.orientation = LinearLayout.HORIZONTAL
+            itemLayout.gravity = Gravity.CENTER_VERTICAL
+            itemLayout.setPadding(8, 16, 8, 16)
+
+            // App Icon
+            val iconView = ImageView(this)
+            iconView.setImageDrawable(app.activityInfo.loadIcon(pm))
+            iconView.layoutParams = LinearLayout.LayoutParams(100, 100)
             
-            startActivity(intent, options.toBundle())
-        } catch (e: Exception) {
-            e.printStackTrace()
-            // Fallback if freeform fails
-            startActivity(intent)
+            // App Name
+            val nameView = TextView(this)
+            nameView.text = app.activityInfo.loadLabel(pm)
+            nameView.setPadding(20, 0, 0, 0)
+            nameView.textSize = 16f
+            nameView.setTextColor(android.graphics.Color.BLACK)
+
+            itemLayout.addView(iconView)
+            itemLayout.addView(nameView)
+            container.addView(itemLayout)
+
+            // Make the app item clickable
+            itemLayout.setOnClickListener {
+                launchAppInMiniScreen(app.activityInfo.packageName)
+            }
+        }
+    }
+
+    private fun launchAppInMiniScreen(pkgName: String) {
+        val launchIntent = packageManager.getLaunchIntentForPackage(pkgName)
+        if (launchIntent != null) {
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+            
+            try {
+                // This tells Android to open the app in a mini box!
+                val options = ActivityOptions.makeBasic()
+                // Define where the mini app should appear: Left, Top, Right, Bottom
+                val bounds = Rect(100, 200, 800, 1200) 
+                options.launchBounds = bounds
+                
+                startActivity(launchIntent, options.toBundle())
+            } catch (e: Exception) {
+                // Fallback if OS blocks window mode
+                startActivity(launchIntent)
+            }
         }
     }
 
