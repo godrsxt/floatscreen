@@ -1,18 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:background="@android:color/transparent">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="250dp"
+    android:layout_height="400dp"
+    android:orientation="vertical"
+    android:background="#DDFFFFFF"
+    android:elevation="8dp">
 
-    <TextView
-        android:id="@+id/floating_bubble"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
-        android:background="#2196F3"
-        android:textColor="#FFFFFF"
-        android:text="Apps"
-        android:gravity="center"
-        android:textStyle="bold"
-        android:elevation="8dp"
-        android:layout_margin="8dp"/>
-</FrameLayout>
+    <!-- Header for Dragging -->
+    <RelativeLayout
+        android:id="@+id/drag_header"
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:background="#333333">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:text="Mini Apps Launcher"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_close"
+            android:layout_width="45dp"
+            android:layout_height="45dp"
+            android:layout_alignParentEnd="true"
+            android:background="@android:color/transparent"
+            android:text="X"
+            android:textColor="#FF5555"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <!-- Scrollable list where we will load your real apps -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        
+        <LinearLayout
+            android:id="@+id/app_list_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp" />
+    </ScrollView>
+</LinearLayout>
